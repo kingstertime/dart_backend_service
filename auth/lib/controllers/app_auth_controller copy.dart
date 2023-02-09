@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:auth/models/app_response_model.dart';
 import 'package:auth/models/user.dart';
+import 'package:auth/utils/app_response.dart';
 import 'package:auth/utils/app_utils.dart';
 import 'package:conduit/conduit.dart';
 import 'package:jaguar_jwt/jaguar_jwt.dart';
@@ -14,9 +15,8 @@ class AppAuthController extends ResourceController {
   @Operation.post()
   Future<Response> signIn(@Bind.body() User user) async {
     if (user.password == null || user.username == null) {
-      return Response.badRequest(
-          body:
-              AppResponseModel(message: "Поля password username обязательны"));
+      return AppResponse.badRequest(
+          message: "Поля password username обязательны");
     }
 
     try {
@@ -37,26 +37,21 @@ class AppAuthController extends ResourceController {
         await _updateTokens(findUser.id ?? -1, managedContext);
         final newUser =
             await managedContext.fetchObjectWithID<User>(findUser.id);
-        return Response.ok(AppResponseModel(
-            data: newUser?.backing.contents, message: "Успещная авторизация"));
+        return AppResponse.ok(
+            body: newUser?.backing.contents, message: "Успещная авторизация");
       } else {
         throw QueryException.input("Пароль не верный", []);
       }
-    } on QueryException catch (error) {
-      return Response.serverError(
-        body: AppResponseModel(
-          message: error.message,
-        ),
-      );
+    } catch (error) {
+      return AppResponse.serverError(error, message: "Ошибка авторизации");
     }
   }
 
   @Operation.put()
   Future<Response> signUp(@Bind.body() User user) async {
     if (user.password == null || user.username == null || user.email == null) {
-      return Response.badRequest(
-          body: AppResponseModel(
-              message: "Поля password username email обязательны"));
+      return AppResponse.badRequest(
+          message: "Поля password username email обязательны");
     }
     final salt = generateRandomSalt();
     final hashPassword = generatePasswordHash(user.password ?? "", salt);
@@ -73,16 +68,12 @@ class AppAuthController extends ResourceController {
         await _updateTokens(id, transaction);
       });
       final userData = await managedContext.fetchObjectWithID<User>(id);
-      return Response.ok(AppResponseModel(
-        data: userData?.backing.contents,
+      return AppResponse.ok(
+        body: userData?.backing.contents,
         message: "Успешная регистрация",
-      ));
-    } on QueryException catch (error) {
-      return Response.serverError(
-        body: AppResponseModel(
-          message: error.message,
-        ),
       );
+    } catch (error) {
+      return AppResponse.serverError(error, message: "Ошибка регистрации");
     }
   }
 
@@ -102,18 +93,17 @@ class AppAuthController extends ResourceController {
       final id = AppUtils.getIdFromToken(refreshToken);
       final user = await managedContext.fetchObjectWithID<User>(id);
       if (user?.refreshToken != refreshToken) {
-        return Response.unauthorized(
-            body: AppResponseModel(message: "Token is not valid"));
+        return AppResponse.unauthorized(message: "Token is not valid");
       } else {
         await _updateTokens(id, managedContext);
         final user = await managedContext.fetchObjectWithID<User>(id);
-        return Response.ok(AppResponseModel(
-            data: user?.backing.contents,
-            message: "Успешное обновление токенов"));
+        return AppResponse.ok(
+            body: user?.backing.contents,
+            message: "Успешное обновление токенов");
       }
     } catch (error) {
-      return Response.serverError(
-          body: AppResponseModel(message: error.toString()));
+      return AppResponse.serverError(error,
+          message: "Ошибка обновления токенов");
     }
   }
 
